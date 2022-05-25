@@ -24,8 +24,16 @@ function clearScreen() {
 function drawCircle(x, y, r, color = '') {
   color && (gl.fillStyle = color)
   gl.beginPath()
-  gl.arc(x, y, r, 0, Math.PI * 180)
+  gl.arc(x, y, r, 0, Math.TAU)
   gl.fill()
+}
+
+function drawCircleStroke(x, y, r, lw, color = '') {
+  color && (gl.strokeStyle = color)
+  gl.lineWidth = lw
+  gl.beginPath()
+  gl.arc(x, y, r, 0, Math.PI * 180)
+  gl.stroke()
 }
 
 function drawRect(x, y, w, h, color = '') {
