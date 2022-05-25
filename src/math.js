@@ -1,3 +1,11 @@
+Math.TAU = Math.PI * 2
+
+function randomInt(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
+}
+
 function sign01(x) {
   return x >= 0 ? 1 : 0
 }
@@ -6,8 +14,16 @@ function approximately(v1, v2, epsilon = 0.0001) {
   Math.abs(v1 - v2) < epsilon
 }
 
+Object.defineProperty(Vector2, 'zero', {
+  get: () => new Vector2(0, 0)
+});
+
 Vector2.prototype.dup = function() {
   return new Vector2(this.x, this.y)
+}
+
+Vector2.prototype.isZero = function() {
+  return (this.x == 0 && this.y ==0)
 }
 
 Vector2.add = function(self, other) {
@@ -16,10 +32,22 @@ Vector2.add = function(self, other) {
   return self
 }
 
+Vector2.prototype.add = function(other) {
+  let res = this.dup()
+  Vector2.add(res, other)
+  return res
+}
+
 Vector2.sub = function(self, other) {
   self.x -= other.x
   self.y -= other.y
   return self
+}
+
+Vector2.prototype.sub = function(other) {
+  let res = this.dup()
+  Vector2.sub(res, other)
+  return res
 }
 
 Vector2.mul = function(self, other) {
@@ -34,10 +62,14 @@ Vector2.div = function(self, other) {
   return self
 }
 
-Vector2.mulByScalar = function(self, scalar) {
+Vector2.mulS = function(self, scalar) {
   self.x *= scalar
   self.y *= scalar
   return self
+}
+
+Vector2.prototype.mulS = function(scalar) {
+  return new Vector2(this.x * scalar, this.y * scalar)
 }
 
 Vector2.avg = function(out, ...vecs) {
@@ -84,12 +116,13 @@ Vector2.normalize = function(vec) {
 }
 
 Vector2.prototype.normalize = function() {
-  if (this.x == 0 && this.y == 0)
-    return this
-  let mag = this.magnitude
-  this.x = this.x / mag
-  this.y = this.y / mag
-  return this
+  let vec = this.dup()
+  if (vec.x == 0 && vec.y == 0)
+    return vec
+  let mag = vec.magnitude
+  vec.x = vec.x / mag
+  vec.y = vec.y / mag
+  return vec
 }
 
 Vector2.prototype.dot = function(other) {
@@ -97,5 +130,10 @@ Vector2.prototype.dot = function(other) {
 }
 
 Vector2.prototype.reflect = function(normal) {
-  return this.sub(normal.mulByScalar(this.dot(normal) * 2))
+  // r = d - 2(d·n)n
+  return this.sub(normal.mulS(2 * this.dot(normal)))
+}
+
+Vector2.prototype.dir = function(to) {
+  return to.sub(this).normalize()
 }
