@@ -3,12 +3,8 @@
 // - [x] 충돌 했을 때 반응하기
 // - [ ] 움직이는 원 2개가 서로 충돌 + 반응하기
 // - [ ] 움직이는 원 n개가 서로 충돌 + 반응하기
-// - [ ] 터널링이 불가능 하게 만들기(CCD)
-// - [ ] 선분도 원과 똑같이 작동하게 만들기
-// - [ ] 원과 선분이 서로 충돌 + 반응하기
-// - [ ] 충돌시 해결시 가속도 반영하기
-// - [ ] 물체 회전 구현하기
-// - [ ] 충돌시 해결시 회전 반영하기
+
+
 //
 // LINKS:
 // - https://www.falstad.com
@@ -17,209 +13,147 @@
 // - https://www.youtube.com/watch?v=eED4bSkYCB8
 
 
+// R_tree
+// B_tree
+// rad_black_tree
+
+
 class Circle {
   constructor(x, y, r, color = '') {
-    // 위치
-    this.pos = new Vector2(x, y)
-    // 반지름
+    // position
+    this.p = new Vector2(x, y)
+
+    // radius
     this.r = r
-    // 이동 방향 (단위 벡터)
-    this.dir = new Vector2(0, 0)
-    // 속력 펙셀/s
-    this.speed = 60
-    // 색
-    this.color = color ? color : '#88e0ff'
-    // 충돌 오브젝트
-    this.hits = []
+
+    // current velocity
+    this.v = new Vector2(0, 0)
+
+    // next frame velocity
+    this.nv = null
+
+    // draw color
+    this.color = color ? color : '#45dfdf'
   }
-  draw() {
-    drawCircle(this.pos.x, this.pos.y, this.r, this.color)
-  }
+
   move(dt) {
-    let moveVec = this.dir.mulByScalar(this.speed * dt)
-    Vector2.add(this.pos, moveVec)
+    Vector2.add(this.p, this.v.mulS(dt))
+  }
+
+  draw() {
+    drawCircleStroke(this.p.x, this.p.y, this.r - 3, 6, this.color)
   }
 }
 
-let circlesDyn = [
-  // new Circle(300, 500, 5),
-  // new Circle(400, 500, 5),
-  new Circle(center.x + 300, center.y, 40),
+let circles = [
+  new Circle(center.x, center.y - 100, 40),
   new Circle(center.x - 300, center.y - 100, 40),
-  new Circle(center.x + 40, center.y + 300, 40)
-]
-// circlesDyn[0].dir = new Vector2(1, -1).normalize()
-// circlesDyn[1].dir = new Vector2(-1, -1).normalize()
-circlesDyn[0].speed = 100
-circlesDyn[0].dir = new Vector2(1, -1).normalize()
-circlesDyn[1].dir.x = -1
-circlesDyn[2].dir = new Vector2(-1, -1).normalize()
-// circlesDyn[3].dir.x = -1
-
-let circlesSty = [
-  new Circle(center.x - 100, center.y, 60, '#aaff33'),
-  new Circle(center.x + 300, center.y + 200, 120, '#aaff33'),
-  new Circle(center.x - 400, center.y - 500, 300, '#aaff33'),
-  new Circle(center.x + 200, center.y - 100, 200, '#aaff33'),
 ]
 
 window.addEventListener('mousedown', event => {
-  if (event.button == 0) {
-    circlesDyn[0].dir = Vector2.normalize(
-      new Vector2(event.x, event.y).sub(circlesDyn[0].pos))
-
-    if (event.shiftKey) {
-      circlesDyn[0].dir.x = 0
-      circlesDyn[0].dir.y = 0
-      circlesDyn[0].pos.x = event.x
-      circlesDyn[0].pos.y = event.y
-    }
+  if (event.button != 0) return
+  if (event.shiftKey) {
+    circles[0].v = Vector2.zero
+    circles[0].nv = null
+    circles[0].p.x = event.x
+    circles[0].p.y = event.y
+  } else {
+    circles[0].v = circles[0].p.dir(new Vector2(event.x, event.y)).mulS(100)
   }
 })
 
+//  충돌 확인
 function colResolveStySty(self, other) {
-  let dirToSelf = Vector2.normalize(other.pos.sub(self.pos))
-  // when not moving
-  if (dirToSelf.x == 0 && dirToSelf.y == 0)
-    return
-  // when overlaping
-  self.pos = other.pos.sub(
-    Vector2.mulByScalar(dirToSelf, self.r + other.r))
+  if (self != other) {
+    return self.p.distSqr(other.p) <= (self.r + other.r)**2
+  }
+  return false
 }
 
-function colResolveDynSty(self, other) {
-  // angle between the direction vector and the x axis
-  let d = -Math.atan(self.dir.y / self.dir.x)
+class Collision {
+  
+  //  충돌한 오브젝트 확인하고 모음
+  static Collision_detection_set(self) {
+    let obj = []
+    
+    for (let other of circles) {
 
-  // rotate the positions to make calculation easier
-  let o1 = self.pos.rotate(d)
-  let o2 = other.pos.rotate(d)
-
-  // x distance from o2
-  let r = self.r + other.r
-  let b = Math.asin(Math.abs(o2.y - o1.y) / r)
-  let l = r * Math.cos(b)
-
-  // resolved position
-  let lSign = sign01(self.dir.x) * 2 - 1
-  let res = new Vector2(o2.x - l * lSign, o1.y)
-  Vector2.rotate(res, -d) // rotate back
-
-  // apply resolved position
-  self.pos = res
-}
-
-let theZ = 0
-
-function colResolveDynDyn(self, other) {
-  let p1 = self.pos
-  let p2 = other.pos
-  let r1 = self.r
-  let r2 = other.r
-  let v1 = self.dir.mulByScalar(self.speed * deltaTime)
-  let v2 = other.dir.mulByScalar(other.speed * deltaTime)
-
-  let vpDot = (
-    - v1.dot(p1)
-    + v1.dot(p2)
-    + v2.dot(p1)
-    - v2.dot(p2)
-  )
-
-  if (vpDot < 0)
-    return
-
-  let z = (2*vpDot)**2
-    - 4*(
-      - ((v1.x - v2.x)**2)
-      - ((v1.y - v2.y)**2)
-    )*(
-      - ((p1.x - p2.x)**2)
-      - ((p1.y - p2.y)**2)
-      + ((r1 + r2)**2)
-    )
-
-  let t = (-0.5*Math.sqrt(z) + vpDot)/(
-        ((v1.x-v2.x)**2) 
-      + ((v1.y-v2.y)**2)
-    )
-
-
-  let o1 = Vector2.add(self.pos, v1.mulByScalar(t))
-  let o2 = Vector2.add(other.pos, v2.mulByScalar(t))
-  // let o1 = self.pos.add(v1.mulByScalar(t))
-  // let o2 = other.pos.add(v2.mulByScalar(t))
-
-  drawCircle(o1.x, o1.y, self.r, '#ffaa22')
-  drawCircle(o2.x, o2.y, other.r, '#ffaa22')
-}
-
-function colResponse(self, other) {
-  // 작용 반작용에 의한 힘 + other이 self를 치는 힘 = 반대로 나가는힘이 나옴 
-  // 벡터의 합을 함 그리고 벡터의 합의 길이를 구함 그러면 
-  let normal = Vector2.normalize(self.pos.sub(other.pos))
-  self.dir = self.dir.reflect(normal)
-
-  gl.lineWidth = 2
-  drawVec(self.pos, self.dir.mulByScalar(20), '#aaaa22')
-}
-
-function colCheckDiscrete(self) {
-  // dynamic vs stationary
-  for (let other of circlesSty) {
-    if (self.pos.distSqr(other.pos) > (self.r+other.r)**2)
-      continue
-    if (self.dir.x == 0 && self.dir.y == 0) {
-      colResolveStySty(self, other)
-    } else {
-      colResolveDynSty(self, other)
     }
-    self.hits.push(other)
   }
 
-  // dynamic vs dynamic
-  for (let other of circlesDyn) {
-    if (other == self || self.pos.distSqr(other.pos) > (self.r+other.r)**2)
-      continue
-    if (self.dir.x == 0 && self.dir.y == 0
-    && other.dir.x == 0 && other.dir.y == 0) {
-      colResolveStySty(self, other)
-    } else {
-      colResolveDynDyn(self, other)
+  static give_directions(self, other) {
+    if (self.v.isZero()) {
+      return Vector2.zero
     }
-    self.hits.push(other)
-    other.hits.push(self)
-  }
+  
+    let hitDir = self.p.dir(other.p)
+    let hitForce = self.v.magnitude * self.v.normalize().dot(hitDir)
 
-  // response
-  for (let hit of self.hits) {
-    // colResponse(self, hit)
+    return hitDir.mulS(hitForce)
   }
-  self.hits = []
+  
+  //  충돌 반응
+  static collision_reaction (self, other) {
+    if (self != other) {
+  
+      // 이걸 이용해 만들수 있다고 생각하는데 뭔가 부족하다
+      // let v1 = self.v.sub((((self.v.sub(other.v).dot(self.pos.sub(other.pos))) / ((self.pos.sub(other.pos)).magnitude**2))) * self.pos.sub(other.pos))
+      // let v2 = other.v.sub(((other.v.sub(self.v).dot(other.pos.sub(self.pos))) / (other.pos.sub(self.pos)).magnitude**2) * other.pos.sub(self.pos))
+  
+      // self.v = v1
+      // other.v = v2
+  
+      let give_self = this.give_directions(self, other)
+      let give_other = this.give_directions(other, self)
+  
+      self.v = self.v.sub(give_self).add(give_other)
+      other.v = other.v.sub(give_other).add(give_self)
+  
+    }
+  }
 }
 
-let deltaTime = 0 // 한 프레임 연산하는데 걸린 시간(초)
-let startTime = performance.now()
+function forAllPairs(array, cb) {
+  if (!array || array.length < 2) return
+  for (let a = 0; a < array.length - 1; ++a)
+    for (let b = a + 1; b < array.length; ++b)
+      cb(array[a], array[b])
+}
+
+
+let deltaTime = 0 // 한 프레임을 연산하는데 걸린 시간(초)
+let startTime = 0
 
 function loop() {
   // calculate delta time
   deltaTime = (performance.now() - startTime) / 1000
   startTime = performance.now()
-
+  
   // clear screen
   clearScreen()
+  
+  // 충돌 감지
+  
 
   // move
-  for (c of circlesDyn) c.move(deltaTime)
+  for (let c of circles) {
+    c.move(deltaTime)
+  }
 
   // draw
-  for (c of circlesDyn) c.draw(deltaTime)
-  for (c of circlesSty) c.draw(deltaTime)
-
-  // handle collision
-  for (c of circlesDyn) colCheckDiscrete(c)
-
-  // loop
-  requestAnimationFrame(loop)
+  for (let c of circles) {
+    c.draw()
+  }
 }
-requestAnimationFrame(loop)
+
+// loop
+; (function LOOP() {
+  loop()
+  requestAnimationFrame(LOOP)
+})()
+
+// window.addEventListener('keydown', (input) => {
+//   if (input.key == ' ') {
+//     loop()
+//   }
+// })
