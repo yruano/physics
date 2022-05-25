@@ -4,7 +4,6 @@
 // - [ ] 움직이는 원 2개가 서로 충돌 + 반응하기
 // - [ ] 움직이는 원 n개가 서로 충돌 + 반응하기
 
-
 //
 // LINKS:
 // - https://www.falstad.com
@@ -72,12 +71,28 @@ function colResolveStySty(self, other) {
 
 class Collision {
   
+ static group = new Map()
+
   //  충돌한 오브젝트 확인하고 모음
   static Collision_detection_set(self) {
     let obj = []
     
     for (let other of circles) {
+      if (self == other) continue
 
+      if (colResolveStySty(self, other)) {
+        if (this.group.has(other)) {
+          if (!this.group.get(other).includes(self))
+            this.group.get(other).push(self)
+          return
+        }
+        obj.push(other)
+      }
+
+      if (obj.length > 0) {
+        obj.push(self)
+        this.group.set(self, obj)
+      }
     }
   }
 
@@ -94,22 +109,19 @@ class Collision {
   
   //  충돌 반응
   static collision_reaction (self, other) {
-    if (self != other) {
-  
-      // 이걸 이용해 만들수 있다고 생각하는데 뭔가 부족하다
-      // let v1 = self.v.sub((((self.v.sub(other.v).dot(self.pos.sub(other.pos))) / ((self.pos.sub(other.pos)).magnitude**2))) * self.pos.sub(other.pos))
-      // let v2 = other.v.sub(((other.v.sub(self.v).dot(other.pos.sub(self.pos))) / (other.pos.sub(self.pos)).magnitude**2) * other.pos.sub(self.pos))
-  
-      // self.v = v1
-      // other.v = v2
-  
-      let give_self = this.give_directions(self, other)
-      let give_other = this.give_directions(other, self)
-  
-      self.v = self.v.sub(give_self).add(give_other)
-      other.v = other.v.sub(give_other).add(give_self)
-  
-    }
+    // 이걸 이용해 만들수 있다고 생각하는데 뭔가 부족하다
+    // let v1 = self.v.sub((((self.v.sub(other.v).dot(self.pos.sub(other.pos))) / ((self.pos.sub(other.pos)).magnitude**2))) * self.pos.sub(other.pos))
+    // let v2 = other.v.sub(((other.v.sub(self.v).dot(other.pos.sub(self.pos))) / (other.pos.sub(self.pos)).magnitude**2) * other.pos.sub(self.pos))
+
+    // self.v = v1
+    // other.v = v2
+
+    let give_self = this.give_directions(self, other)
+    let give_other = this.give_directions(other, self)
+
+    self.v = self.v.sub(give_self).add(give_other)
+    other.v = other.v.sub(give_other).add(give_self)
+
   }
 }
 
@@ -131,9 +143,19 @@ function loop() {
   
   // clear screen
   clearScreen()
+  Collision.group.clear();
   
   // 충돌 감지
-  
+  for (let c of circles) {
+    Collision.Collision_detection_set(c)
+  }
+
+  // 충돌 반응
+  for (let c of Collision.group.values()) {
+    forAllPairs(c, (a, b) => {
+      Collision.collision_reaction(a, b)
+    })
+  }
 
   // move
   for (let c of circles) {
