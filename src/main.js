@@ -11,32 +11,53 @@
 // - https://ericleong.me/research/circle-circle/
 // - https://www.youtube.com/watch?v=eED4bSkYCB8
 
+// https://codepen.io/je3f0o/pen/WJaWZo?editors=0010
 
-// R_tree
-// B_tree
-// rad_black_tree
 
+//  Verlet
+//  R_tree
+//  B_tree
+//  rad_black_tree
+//  spatial hash
 
 class Circle {
   constructor(x, y, r, color = '') {
     // position
     this.p = new Vector2(x, y)
 
-    // radius
-    this.r = r
+    // old_position
+    this.old_p = new Vector2(x, y)
 
-    // current velocity
+    // velocity
     this.v = new Vector2(0, 0)
 
-    // next frame velocity
-    this.nv = null
+    // acceleration
+    this.acc = Vector2.zero
 
-    // draw color
-    this.color = color ? color : '#45dfdf'
+    // radius
+    this.r = r
   }
+  
+  // acceleration(dt) {
+  //   let grav_acc = Vec3d{0.0, 0.0, -9.81 }; // 9.81m/s^2 down in the Z-axis
+  //   let drag_force = 0.5 * drag * (vel * abs(vel)); // D = 0.5 * (rho * C * Area * vel^2)
+  //   let drag_acc = drag_force / mass; // a = F/m
+  //   return grav_acc - drag_acc;
+  // }
 
   move(dt) {
-    Vector2.add(this.p, this.v.mulS(dt))
+    let nextPos =
+    this.p.mulS(2).sub(this.old_p).add(this.acc.mulS(dt ** 2))
+
+    // update previous position
+    this.old_p = this.p
+
+    // update current position
+    this.p = nextPos
+
+    // reset acceleration
+    this.acc.x = 0
+    this.acc.y = 0
   }
 
   draw() {
@@ -45,95 +66,108 @@ class Circle {
 }
 
 let circles = [
-  new Circle(center.x, center.y - 100, 40),
-  new Circle(center.x - 300, center.y - 100, 40),
+  new Circle(center.x, center.y, 40),
+  new Circle(center.x - 100, center.y - 20, 40),
+  new Circle(center.x - 200, center.y - 50, 40),
+  new Circle(center.x - 300, center.y - 80, 40),
+  new Circle(center.x - 500, center.y + 10, 40),
+
 ]
 
 window.addEventListener('mousedown', event => {
-  if (event.button != 0) return
-  if (event.shiftKey) {
-    circles[0].v = Vector2.zero
-    circles[0].nv = null
-    circles[0].p.x = event.x
-    circles[0].p.y = event.y
-  } else {
-    circles[0].v = circles[0].p.dir(new Vector2(event.x, event.y)).mulS(100)
+  if (event.button == 0) {
+    let mousePos = new Vector2(event.x, event.y)
+    if (event.shiftKey) {
+      circles[0].p = mousePos.dup()
+      circles[0].old_p.p = mousePos.dup()
+    } else {
+      circles[0].old_p.p = circles[0].p.dup()
+      Vector2.add(circles[0].old_p.p, mousePos.dir(circles[0].p).mulS(5))
+    }
   }
 })
 
-//  충돌 확인
-function colResolveStySty(self, other) {
+// 충돌 감지
+function collision_detection(self, other) {
   if (self != other) {
-    return self.p.distSqr(other.p) <= (self.r + other.r)**2
+    return (self.p.x - other.p.x) ** 2 + (self.p.y - other.p.y) ** 2 <= (self.r + other.r)**2
   }
-  return false
 }
 
-class Collision {
-  
- static group = new Map()
+class collision {
+  // static group = new Map()
 
-  //  충돌한 오브젝트 확인하고 모음
-  static Collision_detection_set(self) {
-    let obj = []
+  static wall_and_collision_reaction(self) {
+    let damping = 0.98
+    if (self.p.x - self.r < 0) {
+      let vx = (self.old_p.x - self.p.x) * damping
+
+      self.p.x = self.r
+      self.old_p.x = self.p.x - vx
+    } 
+    else if (self.p.x + self.r > canvas.width) {
+      let vx = (self.old_p.x - self.p.x) * damping
+
+      self.p.x = canvas.width - self.r
+      self.old_p.x = self.p.x - vx
+    } 
+    else if (self.p.y - self.r < 0) {
+      let vy = (self.old_p.y - self.p.y) * damping
+
+      self.p.y = self.r
+      self.old_p.y = self.p.y - vy
+    } 
+    else if (self.p.y + self.r > canvas.height) {
+      let vy = (self.old_p.y - self.p.y) * damping
+
+      self.p.y = canvas.height - self.r
+      self.old_p.y = self.p.y - vy
+    }
     
+  }
+  static object_collision_reaction(self) {
+    let damping = 0.98
     for (let other of circles) {
-      if (self == other) continue
-
-      if (colResolveStySty(self, other)) {
-        if (this.group.has(other)) {
-          if (!this.group.get(other).includes(self))
-            this.group.get(other).push(self)
-          return
+      if (self != other) {
+        let x = self.p.x - other.p.x
+        let y = self.p.y - other.p.y
+        let slength = x**2 + y**2
+        let length = Math.sqrt(slength)
+        let target = self.r + other.r
+  
+        if (collision_detection(self, other)) {
+          console.log("sss")
+          let v1x = self.p.x - self.old_p.x
+          let v1y = self.p.y - self.old_p.y
+          let v2x = other.p.x - other.old_p.x
+          let v2y = other.p.y - other.old_p.y
+  
+          let factor = (length-target)/length
+  
+          self.p.x -= x * factor * 0.5;
+          self.p.y -= y * factor * 0.5;
+          other.p.x += x * factor * 0.5;
+          other.p.y += y * factor * 0.5;
+  
+          let f1 = (damping * (x * v1x + y * v1y)) / slength
+          let f2 = (damping * (x * v2x + y * v2y)) / slength
+  
+          v1x += f2 * x - f1 * x
+          v2x += f1 * x - f2 * x
+          v1y += f2 * y - f1 * y
+          v2y += f1 * y - f2 * y
+  
+          self.old_p.x = self.p.x - v1x
+          self.old_p.y = self.p.y - v1y
+          other.old_p.x = self.p.x - v2x
+          other.old_p.y = self.p.y - v2y
         }
-        obj.push(other)
-      }
-
-      if (obj.length > 0) {
-        obj.push(self)
-        this.group.set(self, obj)
       }
     }
   }
-
-  static give_directions(self, other) {
-    if (self.v.isZero()) {
-      return Vector2.zero
-    }
-  
-    let hitDir = self.p.dir(other.p)
-    let hitForce = self.v.magnitude * self.v.normalize().dot(hitDir)
-
-    return hitDir.mulS(hitForce)
-  }
-  
-  //  충돌 반응
-  static collision_reaction (self, other) {
-    // 이걸 이용해 만들수 있다고 생각하는데 뭔가 부족하다
-    // let v1 = self.v.sub((((self.v.sub(other.v).dot(self.pos.sub(other.pos))) / ((self.pos.sub(other.pos)).magnitude**2))) * self.pos.sub(other.pos))
-    // let v2 = other.v.sub(((other.v.sub(self.v).dot(other.pos.sub(self.pos))) / (other.pos.sub(self.pos)).magnitude**2) * other.pos.sub(self.pos))
-
-    // self.v = v1
-    // other.v = v2
-
-    let give_self = this.give_directions(self, other)
-    let give_other = this.give_directions(other, self)
-
-    self.v = self.v.sub(give_self).add(give_other)
-    other.v = other.v.sub(give_other).add(give_self)
-
-  }
 }
 
-function forAllPairs(array, cb) {
-  if (!array || array.length < 2) return
-  for (let a = 0; a < array.length - 1; ++a)
-    for (let b = a + 1; b < array.length; ++b)
-      cb(array[a], array[b])
-}
-
-
-let deltaTime = 0 // 한 프레임을 연산하는데 걸린 시간(초)
+let deltaTime = 0
 let startTime = 0
 
 function loop() {
@@ -143,21 +177,15 @@ function loop() {
   
   // clear screen
   clearScreen()
-  Collision.group.clear();
-  
-  // 충돌 감지
+
   for (let c of circles) {
-    Collision.Collision_detection_set(c)
+    collision.wall_and_collision_reaction(c)
   }
 
-  // 충돌 반응
-  for (let c of Collision.group.values()) {
-    forAllPairs(c, (a, b) => {
-      Collision.collision_reaction(a, b)
-    })
+  for (let c of circles) {
+    collision.object_collision_reaction(c)
   }
 
-  // move
   for (let c of circles) {
     c.move(deltaTime)
   }
