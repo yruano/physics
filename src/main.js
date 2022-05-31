@@ -66,11 +66,11 @@ class Circle {
 }
 
 let circles = [
-  new Circle(center.x, center.y, 40),
-  new Circle(center.x - 100, center.y - 20, 40),
-  new Circle(center.x - 200, center.y - 50, 40),
-  new Circle(center.x - 300, center.y - 80, 40),
-  new Circle(center.x - 500, center.y + 10, 40),
+  new Circle(center.x + 200, center.y, 40),
+  new Circle(center.x - 100, center.y, 40),
+  new Circle(center.x - 200, center.y, 40),
+  new Circle(center.x - 300, center.y, 40),
+  new Circle(center.x - 500, center.y, 40),
 
 ]
 
@@ -87,6 +87,10 @@ window.addEventListener('mousedown', event => {
   }
 })
 
+function gravity(self) {
+  self.old_p.y -= 0.5
+}
+
 // 충돌 감지
 function collision_detection(self, other) {
   if (self != other) {
@@ -95,8 +99,7 @@ function collision_detection(self, other) {
 }
 
 class collision {
-  // static group = new Map()
-
+  // 벽과의 충돌 반응
   static wall_and_collision_reaction(self) {
     let damping = 0.98
     if (self.p.x - self.r < 0) {
@@ -125,6 +128,8 @@ class collision {
     }
     
   }
+
+  // 공과 공의 충돌 반응
   static object_collision_reaction(self) {
     let damping = 0.98
     for (let other of circles) {
@@ -136,7 +141,6 @@ class collision {
         let target = self.r + other.r
   
         if (collision_detection(self, other)) {
-          console.log("sss")
           let v1x = self.p.x - self.old_p.x
           let v1y = self.p.y - self.old_p.y
           let v2x = other.p.x - other.old_p.x
@@ -146,8 +150,8 @@ class collision {
   
           self.p.x -= x * factor * 0.5;
           self.p.y -= y * factor * 0.5;
-          other.p.x += x * factor * 0.5;
-          other.p.y += y * factor * 0.5;
+          other.p.x -= x * factor * 0.5;
+          other.p.y -= y * factor * 0.5;
   
           let f1 = (damping * (x * v1x + y * v1y)) / slength
           let f2 = (damping * (x * v2x + y * v2y)) / slength
@@ -161,14 +165,18 @@ class collision {
           self.old_p.y = self.p.y - v1y
           other.old_p.x = self.p.x - v2x
           other.old_p.y = self.p.y - v2y
+
         }
       }
     }
   }
 }
 
+
+
 let deltaTime = 0
 let startTime = 0
+
 
 function loop() {
   // calculate delta time
@@ -177,15 +185,24 @@ function loop() {
   
   // clear screen
   clearScreen()
+  
+  // 중력
+  for (let c of circles) {
+    gravity(c)
+  }
 
+  // 충돌확인
   for (let c of circles) {
     collision.wall_and_collision_reaction(c)
   }
 
+  // 공의 충돌 반응
   for (let c of circles) {
     collision.object_collision_reaction(c)
   }
 
+
+  // 공의 움직임
   for (let c of circles) {
     c.move(deltaTime)
   }
